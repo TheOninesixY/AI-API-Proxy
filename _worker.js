@@ -1,58 +1,49 @@
+```javascript
 const TARGET = "https://generativelanguage.googleapis.com";
 
 export default {
   async fetch(request) {
-    const clientUrl = new URL(request.url);
-    const rawKey =
-      request.headers.get("x-goog-api-key") ||
-      clientUrl.searchParams.get("key") ||
-      "";
+    const url = new URL(request.url);
+
+    const headerKey = request.headers.get("x-goog-api-key");
+    const queryKey = url.searchParams.get("key");
+
+    const rawKey = headerKey || queryKey || "";
 
     const keys = rawKey
       .split(",")
       .map(key => key.trim())
       .filter(Boolean);
 
-    const body =
-      request.method === "GET" || request.method === "HEAD"
-        ? undefined
-        : await request.arrayBuffer();
+    const targetUrl = new URL(
+      TARGET + url.pathname + url.search
+    );
 
     const headers = new Headers(request.headers);
-    headers.delete("x-goog-api-key");
 
     if (!keys.length) {
-      const targetUrl = new URL(`${TARGET}${clientUrl.pathname}${clientUrl.search}`);
-
-      return fetch(new Request(targetUrl, {
-        method: request.method,
-        headers,
-        body,
-        redirect: request.redirect
-      }), {
+      return fetch(new Request(targetUrl, request), {
         cache: "no-store"
       });
     }
 
+    headers.delete("x-goog-api-key");
+    targetUrl.searchParams.delete("key");
+
     for (let i = 0; i < keys.length; i++) {
-      const targetUrl = new URL(`${TARGET}${clientUrl.pathname}`);
+      headers.set("x-goog-api-key", keys[i]);
 
-      clientUrl.searchParams.forEach((value, name) => {
-        if (name !== "key") {
-          targetUrl.searchParams.append(name, value);
+      const response = await fetch(
+        new Request(targetUrl, {
+          method: request.method,
+          headers,
+          body: request.body,
+          redirect: request.redirect
+        }),
+        {
+          cache: "no-store"
         }
-      });
-
-      targetUrl.searchParams.set("key", keys[i]);
-
-      const response = await fetch(new Request(targetUrl, {
-        method: request.method,
-        headers,
-        body,
-        redirect: request.redirect
-      }), {
-        cache: "no-store"
-      });
+      );
 
       if (response.status !== 429 && response.status !== 503) {
         return response;
@@ -64,3 +55,4 @@ export default {
     }
   }
 };
+```
