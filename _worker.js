@@ -2,10 +2,10 @@ const TARGET = "https://generativelanguage.googleapis.com";
 
 export default {
   async fetch(request) {
-    const url = new URL(request.url);
+    const incoming = new URL(request.url);
 
     const headerKey = request.headers.get("x-goog-api-key");
-    const queryKey = url.searchParams.get("key");
+    const queryKey = incoming.searchParams.get("key");
     const rawKey = headerKey || queryKey || "";
 
     const keys = rawKey
@@ -13,49 +13,43 @@ export default {
       .map(key => key.trim())
       .filter(Boolean);
 
-    if (keys.length === 0) {
+    if (!keys.length) {
       const target = new URL(
-        TARGET + url.pathname + url.search
+        TARGET + incoming.pathname + incoming.search
       );
 
-      return fetch(target, {
-        method: request.method,
-        headers: request.headers,
-        body: request.method === "GET" || request.method === "HEAD"
-          ? undefined
-          : request.body,
-        redirect: request.redirect
+      return fetch(new Request(target, request), {
+        cache: "no-store"
       });
     }
 
-    const body =
-      request.method === "GET" || request.method === "HEAD"
-        ? undefined
-        : await request.arrayBuffer();
-
     const headers = new Headers(request.headers);
-
-    headers.delete("x-goog-api-key");
     headers.delete("content-length");
+    headers.delete("x-goog-api-key");
 
     for (const key of keys) {
       const target = new URL(
-        TARGET + url.pathname
+        TARGET + incoming.pathname
       );
 
-      for (const [name, value] of url.searchParams) {
+      for (const [name, value] of incoming.searchParams) {
         if (name !== "key") {
           target.searchParams.append(name, value);
         }
       }
 
-      headers.set("x-goog-api-key", key);
-
-      const response = await fetch(target, {
+      const retryRequest = new Request(target, {
         method: request.method,
         headers,
-        body,
-        redirect: request.redirect,
+        body: request.method === "GET" || request.method === "HEAD"
+          ? undefined
+          : request.clone().body,
+        redirect: request.redirect
+      });
+
+      retryRequest.headers.set("x-goog-api-key", key);
+
+      const response = await fetch(retryRequest, {
         cache: "no-store"
       });
 
