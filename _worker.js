@@ -1,56 +1,59 @@
-const TARGET = "https://generativelanguage.googleapis.com";
+const GEMINI_API = "https://generativelanguage.googleapis.com";
 
 export default {
   async fetch(request) {
-    const url = new URL(request.url);
+    const incomingUrl = new URL(request.url);
 
-    const rawKey =
-      request.headers.get("x-goog-api-key") ??
-      url.searchParams.get("key") ??
-      "";
+    const headerKey = request.headers.get("x-goog-api-key");
+    const queryKey = incomingUrl.searchParams.get("key");
 
-    const keys = rawKey
+    const rawKeys = headerKey ?? queryKey ?? "";
+
+    const keys = rawKeys
       .split(",")
       .map(key => key.trim())
       .filter(Boolean);
 
-    const target = new URL(
-      `${TARGET}${url.pathname}${url.search}`
+    const targetUrl = new URL(
+      GEMINI_API + incomingUrl.pathname + incomingUrl.search
     );
 
-    target.searchParams.delete("key");
-
-    const headers = new Headers();
-
-    for (const [key, value] of request.headers) {
-      if (key.toLowerCase() === "content-type") {
-        headers.set(key, value);
-      }
+    if (queryKey !== null) {
+      targetUrl.searchParams.delete("key");
     }
 
-    const body =
-      request.method === "GET" || request.method === "HEAD"
-        ? undefined
-        : await request.clone().arrayBuffer();
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "*",
+          "Access-Control-Allow-Headers": "*"
+        }
+      });
+    }
 
     if (keys.length === 0) {
-      return fetch(target.toString(), {
-        method: request.method,
-        headers,
-        body
-      });
+      return fetch(
+        new Request(targetUrl.toString(), request)
+      );
     }
 
     for (const key of keys) {
-      headers.set("x-goog-api-key", key);
+      const proxiedRequest = new Request(
+        targetUrl.toString(),
+        request
+      );
 
-      const response = await fetch(target.toString(), {
-        method: request.method,
-        headers,
-        body
-      });
+      proxiedRequest.headers.set("x-goog-api-key", key);
+
+      const response = await fetch(proxiedRequest);
 
       if (response.status !== 429 && response.status !== 503) {
+        return response;
+      }
+
+      if (key === keys[keys.length - 1]) {
         return response;
       }
     }
