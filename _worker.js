@@ -1,4 +1,3 @@
-```javascript
 const TARGET = "https://generativelanguage.googleapis.com";
 
 export default {
@@ -7,7 +6,6 @@ export default {
 
     const headerKey = request.headers.get("x-goog-api-key");
     const queryKey = url.searchParams.get("key");
-
     const rawKey = headerKey || queryKey || "";
 
     const keys = rawKey
@@ -15,44 +13,59 @@ export default {
       .map(key => key.trim())
       .filter(Boolean);
 
-    const targetUrl = new URL(
-      TARGET + url.pathname + url.search
-    );
+    if (keys.length === 0) {
+      const target = new URL(
+        TARGET + url.pathname + url.search
+      );
 
-    const headers = new Headers(request.headers);
-
-    if (!keys.length) {
-      return fetch(new Request(targetUrl, request), {
-        cache: "no-store"
+      return fetch(target, {
+        method: request.method,
+        headers: request.headers,
+        body: request.method === "GET" || request.method === "HEAD"
+          ? undefined
+          : request.body,
+        redirect: request.redirect
       });
     }
 
+    const body =
+      request.method === "GET" || request.method === "HEAD"
+        ? undefined
+        : await request.arrayBuffer();
+
+    const headers = new Headers(request.headers);
+
     headers.delete("x-goog-api-key");
-    targetUrl.searchParams.delete("key");
+    headers.delete("content-length");
 
-    for (let i = 0; i < keys.length; i++) {
-      headers.set("x-goog-api-key", keys[i]);
-
-      const response = await fetch(
-        new Request(targetUrl, {
-          method: request.method,
-          headers,
-          body: request.body,
-          redirect: request.redirect
-        }),
-        {
-          cache: "no-store"
-        }
+    for (const key of keys) {
+      const target = new URL(
+        TARGET + url.pathname
       );
+
+      for (const [name, value] of url.searchParams) {
+        if (name !== "key") {
+          target.searchParams.append(name, value);
+        }
+      }
+
+      headers.set("x-goog-api-key", key);
+
+      const response = await fetch(target, {
+        method: request.method,
+        headers,
+        body,
+        redirect: request.redirect,
+        cache: "no-store"
+      });
 
       if (response.status !== 429 && response.status !== 503) {
         return response;
       }
 
-      if (i === keys.length - 1) {
+      if (key === keys[keys.length - 1]) {
         return response;
       }
     }
   }
 };
-```
