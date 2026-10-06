@@ -34,11 +34,13 @@ export default {
       const response = await fetch(new Request(targetUrl, {
         method: request.method,
         headers,
-        body: request.method === "GET" || request.method === "HEAD" ? undefined : request.body,
+        body: request.method === "GET" || request.method === "HEAD"
+          ? undefined
+          : request.body,
         redirect: request.redirect
       }));
 
-      if (response.status !== 429) {
+      if (response.status !== 429 && response.status !== 503) {
         return response;
       }
 
