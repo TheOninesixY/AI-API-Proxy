@@ -3,7 +3,6 @@ const TARGET = "https://generativelanguage.googleapis.com";
 export default {
   async fetch(request) {
     const url = new URL(request.url);
-    const targetUrl = `${TARGET}${url.pathname}${url.search}`;
 
     const rawKey =
       request.headers.get("x-goog-api-key") ||
@@ -12,33 +11,30 @@ export default {
 
     const keys = rawKey
       .split(",")
-      .map(k => k.trim())
+      .map(key => key.trim())
       .filter(Boolean);
 
-    const headers = new Headers();
+    const targetUrl = new URL(
+      `${TARGET}${url.pathname}${url.search}`
+    );
 
-    for (const [name, value] of request.headers) {
-      if (name.toLowerCase() === "content-type") {
-        headers.set(name, value);
-      }
+    if (keys.length > 0) {
+      targetUrl.searchParams.delete("key");
     }
 
-    if (!keys.length) {
-      return fetch(targetUrl, {
-        method: request.method,
-        headers,
-        body: request.body
-      });
+    if (keys.length === 0) {
+      return fetch(new Request(targetUrl, request.clone()));
     }
 
     for (const key of keys) {
-      headers.set("x-goog-api-key", key);
+      const proxiedRequest = new Request(
+        targetUrl,
+        request.clone()
+      );
 
-      const response = await fetch(targetUrl, {
-        method: request.method,
-        headers,
-        body: request.body
-      });
+      proxiedRequest.headers.set("x-goog-api-key", key);
+
+      const response = await fetch(proxiedRequest);
 
       if (response.status !== 429 && response.status !== 503) {
         return response;
