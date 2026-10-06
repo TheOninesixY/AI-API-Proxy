@@ -4,6 +4,19 @@ export default {
   async fetch(request) {
     const url = new URL(request.url);
 
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": request.headers.get("Origin") || "*",
+          "Access-Control-Allow-Methods": "GET,HEAD,POST,OPTIONS",
+          "Access-Control-Allow-Headers":
+            request.headers.get("Access-Control-Request-Headers") || "*",
+          "Access-Control-Max-Age": "86400"
+        }
+      });
+    }
+
     const rawKey =
       request.headers.get("x-goog-api-key") ||
       url.searchParams.get("key") ||
@@ -11,7 +24,7 @@ export default {
 
     const keys = rawKey
       .split(",")
-      .map(key => key.trim())
+      .map(k => k.trim())
       .filter(Boolean);
 
     const targetUrl = new URL(
