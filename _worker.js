@@ -3,42 +3,54 @@ const TARGET = "https://generativelanguage.googleapis.com";
 export default {
   async fetch(request) {
     const clientUrl = new URL(request.url);
-    const headerKey = request.headers.get("x-goog-api-key");
-    const queryKey = clientUrl.searchParams.get("key");
-    const rawKeys = headerKey || queryKey || "";
+    const rawKey =
+      request.headers.get("x-goog-api-key") ||
+      clientUrl.searchParams.get("key") ||
+      "";
 
-    const keys = rawKeys
+    const keys = rawKey
       .split(",")
       .map(key => key.trim())
       .filter(Boolean);
 
-    if (keys.length === 0) {
+    if (!keys.length) {
       return new Response("Missing API key", { status: 401 });
     }
 
     for (const key of keys) {
       const targetUrl = new URL(TARGET);
+
       targetUrl.pathname = clientUrl.pathname;
 
-      clientUrl.searchParams.forEach((value, name) => {
+      for (const [name, value] of clientUrl.searchParams) {
         if (name !== "key") {
           targetUrl.searchParams.append(name, value);
         }
-      });
+      }
 
       targetUrl.searchParams.set("key", key);
 
-      const headers = new Headers(request.headers);
-      headers.delete("x-goog-api-key");
+      const headers = new Headers();
+
+      for (const name of [
+        "accept",
+        "content-type",
+        "x-goog-api-client"
+      ]) {
+        const value = request.headers.get(name);
+        if (value) {
+          headers.set(name, value);
+        }
+      }
 
       const response = await fetch(
         new Request(targetUrl, {
           method: request.method,
           headers,
-          body: ["GET", "HEAD"].includes(request.method)
-            ? undefined
-            : request.body,
-          redirect: request.redirect
+          body:
+            request.method === "GET" || request.method === "HEAD"
+              ? undefined
+              : request.body
         })
       );
 
