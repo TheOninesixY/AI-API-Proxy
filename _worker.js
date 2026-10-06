@@ -2,45 +2,42 @@ const TARGET = "https://generativelanguage.googleapis.com";
 
 export default {
   async fetch(request) {
-    const incomingUrl = new URL(request.url);
-    const rawKey =
-      incomingUrl.searchParams.get("key") ||
-      request.headers.get("x-goog-api-key") ||
-      "";
+    const clientUrl = new URL(request.url);
+    const headerKey = request.headers.get("x-goog-api-key");
+    const queryKey = clientUrl.searchParams.get("key");
+    const rawKeys = headerKey || queryKey || "";
 
-    const keys = rawKey
+    const keys = rawKeys
       .split(",")
       .map(key => key.trim())
       .filter(Boolean);
 
-    if (!keys.length) {
-      return fetch(
-        new Request(`${TARGET}${incomingUrl.pathname}${incomingUrl.search}`, request)
-      );
+    if (keys.length === 0) {
+      return new Response("Missing API key", { status: 401 });
     }
 
     for (const key of keys) {
-      const url = new URL(`${TARGET}${incomingUrl.pathname}`);
+      const targetUrl = new URL(TARGET);
+      targetUrl.pathname = clientUrl.pathname;
 
-      incomingUrl.searchParams.forEach((value, name) => {
+      clientUrl.searchParams.forEach((value, name) => {
         if (name !== "key") {
-          url.searchParams.append(name, value);
+          targetUrl.searchParams.append(name, value);
         }
       });
 
-      url.searchParams.set("key", key);
+      targetUrl.searchParams.set("key", key);
 
       const headers = new Headers(request.headers);
       headers.delete("x-goog-api-key");
 
       const response = await fetch(
-        new Request(url, {
+        new Request(targetUrl, {
           method: request.method,
           headers,
-          body:
-            request.method === "GET" || request.method === "HEAD"
-              ? undefined
-              : request.body,
+          body: ["GET", "HEAD"].includes(request.method)
+            ? undefined
+            : request.body,
           redirect: request.redirect
         })
       );
