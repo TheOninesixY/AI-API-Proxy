@@ -13,8 +13,23 @@ export default {
       .map(key => key.trim())
       .filter(Boolean);
 
+    const body =
+      request.method === "GET" || request.method === "HEAD"
+        ? undefined
+        : await request.arrayBuffer();
+
+    const headers = new Headers(request.headers);
+    headers.delete("x-goog-api-key");
+
     if (!keys.length) {
-      return fetch(new Request(`${TARGET}${clientUrl.pathname}${clientUrl.search}`, request), {
+      const targetUrl = new URL(`${TARGET}${clientUrl.pathname}${clientUrl.search}`);
+
+      return fetch(new Request(targetUrl, {
+        method: request.method,
+        headers,
+        body,
+        redirect: request.redirect
+      }), {
         cache: "no-store"
       });
     }
@@ -30,22 +45,14 @@ export default {
 
       targetUrl.searchParams.set("key", keys[i]);
 
-      const headers = new Headers(request.headers);
-      headers.delete("x-goog-api-key");
-
-      const response = await fetch(
-        new Request(targetUrl, {
-          method: request.method,
-          headers,
-          body: request.method === "GET" || request.method === "HEAD"
-            ? undefined
-            : request.clone().body,
-          redirect: request.redirect
-        }),
-        {
-          cache: "no-store"
-        }
-      );
+      const response = await fetch(new Request(targetUrl, {
+        method: request.method,
+        headers,
+        body,
+        redirect: request.redirect
+      }), {
+        cache: "no-store"
+      });
 
       if (response.status !== 429 && response.status !== 503) {
         return response;
