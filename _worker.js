@@ -14,12 +14,11 @@ export default {
       .filter(Boolean);
 
     if (!keys.length) {
-      return new Response("Missing API key", { status: 401 });
+      return fetch(new Request(`${TARGET}${clientUrl.pathname}${clientUrl.search}`, request));
     }
 
     for (const key of keys) {
-      const targetUrl = new URL(TARGET);
-      targetUrl.pathname = clientUrl.pathname;
+      const targetUrl = new URL(`${TARGET}${clientUrl.pathname}`);
 
       clientUrl.searchParams.forEach((value, name) => {
         if (name !== "key") {
@@ -32,16 +31,12 @@ export default {
       const headers = new Headers(request.headers);
       headers.delete("x-goog-api-key");
 
-      const response = await fetch(
-        new Request(targetUrl, {
-          method: request.method,
-          headers,
-          body: request.method === "GET" || request.method === "HEAD"
-            ? undefined
-            : request.body,
-          redirect: request.redirect
-        })
-      );
+      const response = await fetch(new Request(targetUrl, {
+        method: request.method,
+        headers,
+        body: request.method === "GET" || request.method === "HEAD" ? undefined : request.body,
+        redirect: request.redirect
+      }));
 
       if (response.status !== 429) {
         return response;
